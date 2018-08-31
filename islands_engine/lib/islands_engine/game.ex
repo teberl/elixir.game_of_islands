@@ -27,13 +27,7 @@ defmodule IslandsEngine.Game do
   """
   @type player() :: %{name: any(), board: map(), guesses: Guesses.t()}
 
-  @spec init(any()) ::
-          {:ok,
-           %{
-             player1: player(),
-             player2: player(),
-             rules: Rules.t()
-           }}
+  @spec init(name :: any()) :: {:ok, %{player1: player(), player2: player(), rules: %Rules{}}}
   def init(name) do
     player1 = %{name: name, board: Board.new(), guesses: Guesses.new()}
     player2 = %{name: nil, board: Board.new(), guesses: Guesses.new()}

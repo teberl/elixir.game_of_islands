@@ -18,7 +18,7 @@ defmodule IslandsEngine.Rules do
   player1: player_state() with initial value :islands_not_set
   player2: player_state() with initial value :islands_not_set
   """
-  @type t :: %{state: game_state(), player: player_state(), player2: player_state()}
+  @type t :: %__MODULE__{state: game_state(), player1: player_state(), player2: player_state()}
   defstruct(
     state: :initialized,
     player1: :islands_not_set,

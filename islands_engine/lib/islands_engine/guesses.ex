@@ -1,6 +1,9 @@
 defmodule IslandsEngine.Guesses do
   alias IslandsEngine.{Guesses, Coordinate}
 
+
+  @type t :: %IslandsEngine.Guesses{hits: map(), misses: map()}
+
   @enforce_keys [:hits, :misses]
   defstruct [:hits, :misses]
 
