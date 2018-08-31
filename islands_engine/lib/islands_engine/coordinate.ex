@@ -11,7 +11,7 @@ defmodule IslandsEngine.Coordinate do
   @board_range 1..10
 
   @typedoc """
-    Coordinate are the basic units of both players’ boards and of islands.
+    Coordinate are the basic units of both players, boards and of islands.
     [:row, :col]
   """
   @type t :: %__MODULE__{row: 1..10, col: 1..10}
