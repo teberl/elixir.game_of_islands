@@ -1,9 +1,14 @@
 defmodule IslandsEngine.Island do
   alias IslandsEngine.{Coordinate, Island}
 
+  @type island_type() :: :square | :atol | :dot | :l_shape | :s_shape
+
+  @type t() :: %__MODULE__{coordinates: any(), hit_coordinates: any()}
+
   @enforce_keys [:coordinates, :hit_coordinates]
   defstruct [:coordinates, :hit_coordinates]
 
+  @spec new(IslandsEngine.Island.island_type(), IslandsEngine.Coordinate.t()) :: any()
   def new(type, %Coordinate{} = upper_left) do
     with [_ | _] = offsets <- offsets(type),
          %MapSet{} = coordinates <- add_coordinates(offsets, upper_left) do

@@ -6,17 +6,21 @@ defmodule IslandsEngine.Rules do
   @typedoc """
   The state value for a player, if both players have :islands_set
   the game_state can change to :player1_turn and guessing can start
-
-    * :islands_not_set: the player has not set all islands yet
-    * :islands_set: the player has positioned all islands
   """
   @type player_state :: :islands_not_set | :islands_set
 
   @typedoc """
+  Action types which can be performed an the state_machine
+  """
+  @type actions ::
+          :add_player
+          | {:position_island, :player1 | :player2}
+          | {:set_islands, :player1 | :player2}
+          | {:guess_coordinate, :player1 | :player2}
+          | {:win_check, :win | :no_win}
+
+  @typedoc """
   IslandsEngine.Rules.t() represents the state_machine
-  state: game_state() with initial value :initialized
-  player1: player_state() with initial value :islands_not_set
-  player2: player_state() with initial value :islands_not_set
   """
   @type t :: %__MODULE__{state: game_state(), player1: player_state(), player2: player_state()}
   defstruct(
@@ -25,13 +29,17 @@ defmodule IslandsEngine.Rules do
     player2: :islands_not_set
   )
 
+  @spec new() :: IslandsEngine.Rules.t()
   def new(), do: %Rules{}
 
+  @spec check(IslandsEngine.Rules.t(), IslandsEngine.Rules.actions()) ::
+          :error
+          | {:ok, IslandsEngine.Rules.t()}
   def check(%Rules{state: :initialized} = rules, :add_player) do
-    {:ok, %Rules{rules | state: :player_set}}
+    {:ok, %Rules{rules | state: :players_set}}
   end
 
-  def check(%Rules{state: :players_set} = rules, {:position_islands, player}) do
+  def check(%Rules{state: :players_set} = rules, {:position_island, player}) do
     case Map.fetch!(rules, player) do
       :islands_set -> :error
       :islands_not_set -> {:ok, rules}
