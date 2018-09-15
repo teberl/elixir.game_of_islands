@@ -5,7 +5,7 @@ defmodule IslandsEngine.Game do
   Each instance of this GenServer is started as a separate process and
   represents an individual game.
   """
-  use GenServer
+  use GenServer, restart: :transient, shutdown: 5_000, type: :worker
   alias IslandsEngine.{Board, Coordinate, Guesses, Rules, Island}
 
   @typedoc """
@@ -18,6 +18,9 @@ defmodule IslandsEngine.Game do
 
   @players [:player1, :player2]
 
+  # a game will timeout after 2 hrs of inactivity
+  @timeout 60 * 60 * 2 * 1_000
+
   @doc """
   Starts a new instance of islands game instance
 
@@ -28,7 +31,7 @@ defmodule IslandsEngine.Game do
   """
   @spec start_link(binary()) :: :ignore | {:error, any()} | {:ok, pid()}
   def start_link(name) when is_binary(name) do
-    GenServer.start_link(__MODULE__, name, [])
+    GenServer.start_link(__MODULE__, name, name: via_tuple(name))
   end
 
   @doc """
@@ -89,14 +92,21 @@ defmodule IslandsEngine.Game do
     GenServer.call(pid, {:guess_coordinate, player, row, col})
   end
 
+  def via_tuple(name), do: {:via, Registry, {Registry.Game, name}}
+
   # -----------------------------------
   # ------- GenServer callbacks -------
   # -----------------------------------
-  @spec init(name :: any()) :: {:ok, %{player1: player(), player2: player(), rules: %Rules{}}}
+  @spec init(name :: any()) ::
+          {:ok, %{player1: player(), player2: player(), rules: %Rules{}}, 7_200_000}
   def init(name) do
     player1 = %{name: name, board: Board.new(), guesses: Guesses.new()}
     player2 = %{name: nil, board: Board.new(), guesses: Guesses.new()}
-    {:ok, %{player1: player1, player2: player2, rules: %Rules{}}}
+    {:ok, %{player1: player1, player2: player2, rules: %Rules{}}, @timeout}
+  end
+
+  def handle_info(:timeout, state) do
+    {:stop, {:shutdown, :timeout}, state}
   end
 
   def handle_call({:add_player, name}, _from, state) do
@@ -106,7 +116,7 @@ defmodule IslandsEngine.Game do
       |> update_rules(rules)
       |> reply_sucess(:ok)
     else
-      :error -> {:reply, :error, state}
+      :error -> reply_error(state, :error)
     end
   end
 
@@ -122,10 +132,10 @@ defmodule IslandsEngine.Game do
       |> update_rules(rules)
       |> reply_sucess(:ok)
     else
-      :error -> {:reply, :error, state}
-      {:error, :invalid_coordinate} -> {:reply, {:error, :invalid_coordinate}, state}
-      {:error, :invalid_island_type} -> {:reply, {:error, :invalid_island_type}, state}
-      {:error, :overlapping_islands} -> {:reply, {:error, :overlapping_islands}, state}
+      :error -> reply_error(state, :error)
+      {:error, :invalid_coordinate} -> reply_error(state, {:error, :invalid_coordinate})
+      {:error, :invalid_island_type} -> reply_error(state, {:error, :invalid_island_type})
+      {:error, :overlapping_islands} -> reply_error(state, {:error, :overlapping_islands})
     end
   end
 
@@ -138,8 +148,8 @@ defmodule IslandsEngine.Game do
       |> update_rules(rules)
       |> reply_sucess({:ok, board})
     else
-      :error -> {:reply, :error, state}
-      false -> {:reply, {:error, :not_all_islands_positioned}, state}
+      :error -> reply_error(state, :error)
+      false -> reply_error(state, {:error, :not_all_islands_positioned})
     end
   end
 
@@ -158,8 +168,8 @@ defmodule IslandsEngine.Game do
       |> update_rules(rules)
       |> reply_sucess({:ok, hit_or_miss, forested_island, win_or_not})
     else
-      :error -> {:reply, :error, state}
-      {:error, :invalid_coordinate} -> {:reply, {:error, :invalid_coordinate}, state}
+      :error -> reply_error(state, :error)
+      {:error, :invalid_coordinate} -> reply_error(state, {:error, :invalid_coordinate})
     end
   end
 
@@ -169,7 +179,9 @@ defmodule IslandsEngine.Game do
 
   defp update_rules(state, rules), do: Map.put(state, :rules, rules)
 
-  defp reply_sucess(state, reply), do: {:reply, reply, state}
+  defp reply_sucess(state, reply), do: {:reply, reply, state, @timeout}
+
+  defp reply_error(state, reply), do: {:reply, reply, state, @timeout}
 
   defp update_board(state, player, board) do
     Map.update!(state, player, fn player -> %{player | board: board} end)
