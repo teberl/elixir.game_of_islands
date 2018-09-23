@@ -97,16 +97,32 @@ defmodule IslandsEngine.Game do
   # -----------------------------------
   # ------- GenServer callbacks -------
   # -----------------------------------
-  @spec init(name :: any()) ::
-          {:ok, %{player1: player(), player2: player(), rules: %Rules{}}, 7_200_000}
+  @spec init(name :: any()) :: {:ok, %{player1: player(), player2: player(), rules: %Rules{}}}
   def init(name) do
-    player1 = %{name: name, board: Board.new(), guesses: Guesses.new()}
-    player2 = %{name: nil, board: Board.new(), guesses: Guesses.new()}
-    {:ok, %{player1: player1, player2: player2, rules: %Rules{}}, @timeout}
+    send(self(), {:set_state, name})
+    {:ok, fresh_state(name)}
   end
+
+  def terminate({:shutdown, :timeout}, state) do
+    :ets.delete(:game_state, state.player1.name)
+    :ok
+  end
+
+  def teminate(_reason, _state), do: :ok
 
   def handle_info(:timeout, state) do
     {:stop, {:shutdown, :timeout}, state}
+  end
+
+  def handle_info({:set_state, name}, _state) do
+    state =
+      case :ets.lookup(:game_state, name) do
+        [] -> fresh_state(name)
+        [{_name, restored_state}] -> restored_state
+      end
+
+    :ets.insert(:game_state, {name, state})
+    {:noreply, state, @timeout}
   end
 
   def handle_call({:add_player, name}, _from, state) do
@@ -179,7 +195,10 @@ defmodule IslandsEngine.Game do
 
   defp update_rules(state, rules), do: Map.put(state, :rules, rules)
 
-  defp reply_sucess(state, reply), do: {:reply, reply, state, @timeout}
+  defp reply_sucess(state, reply) do
+    :ets.insert(:game_state, {state.player1.name, state})
+    {:reply, reply, state, @timeout}
+  end
 
   defp reply_error(state, reply), do: {:reply, reply, state, @timeout}
 
@@ -197,4 +216,10 @@ defmodule IslandsEngine.Game do
 
   defp opponent(:player1), do: :player2
   defp opponent(:player2), do: :player1
+
+  defp fresh_state(name) do
+    player1 = %{name: name, board: Board.new(), guesses: Guesses.new()}
+    player2 = %{name: nil, board: Board.new(), guesses: Guesses.new()}
+    %{player1: player1, player2: player2, rules: %Rules{}}
+  end
 end
